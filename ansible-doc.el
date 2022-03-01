@@ -118,7 +118,7 @@
     (message "Finding Ansible modules...")
     (with-temp-buffer
       (when (with-demoted-errors "Error while finding Ansible modules: %S"
-              (let ((retcode (call-process "ansible-doc" nil t nil "--list")))
+              (let ((retcode (call-process "ansible-doc" nil '(t nil) nil "--list")))
                 (unless (equal retcode 0)
                   (error "Command ansible-doc --list failed with code %s, returned %s"
                          retcode (buffer-string)))
