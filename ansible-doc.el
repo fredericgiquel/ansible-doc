@@ -133,10 +133,18 @@
           (push (match-string 1) ansible-doc--modules)))))
   ansible-doc--modules)
 
+(defun ansible-doc--symbol-with-dots-at-point ()
+  "Return symbol with dots at point."
+  (let ((table (make-syntax-table)))
+    (modify-syntax-entry ?. "_" table)
+    (with-syntax-table table
+      (thing-at-point 'symbol))))
+
 (defun ansible-doc-read-module (prompt)
   "Read a Ansible module name from minibuffer with PROMPT."
   (let* ((modules (ansible-doc-modules))
-         (symbol (thing-at-point 'symbol))
+         (symbol (string-remove-prefix "ansible.builtin."
+                                       (ansible-doc--symbol-with-dots-at-point)))
          (default (if (or (null modules) (member symbol modules))
                       symbol
                     nil))
