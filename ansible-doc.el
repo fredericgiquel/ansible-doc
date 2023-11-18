@@ -143,8 +143,7 @@
 (defun ansible-doc-read-module (prompt)
   "Read a Ansible module name from minibuffer with PROMPT."
   (let* ((modules (ansible-doc-modules))
-         (symbol (string-remove-prefix "ansible.builtin."
-                                       (ansible-doc--symbol-with-dots-at-point)))
+         (symbol (ansible-doc--symbol-with-dots-at-point))
          (default (if (or (null modules) (member symbol modules))
                       symbol
                     nil))
