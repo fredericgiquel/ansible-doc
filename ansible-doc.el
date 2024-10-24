@@ -38,6 +38,7 @@
 ;;; Code:
 
 (require 'button)
+(require 'ansi-color)
 
 ;;; Bookmark integration
 (defvar bookmark-make-record-function)
@@ -329,7 +330,9 @@ If NOCONFIRM is non-nil revert without prompt."
       (with-current-buffer buffer
         (ansible-doc-module-mode)
         (setq ansible-doc-current-module module)
-        (revert-buffer nil 'noconfirm)))
+        (revert-buffer nil 'noconfirm)
+        (let ((inhibit-read-only t))
+          (ansi-color-apply-on-region (point-min) (point-max)))))
     buffer))
 
 ;;;###autoload
