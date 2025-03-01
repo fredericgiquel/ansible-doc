@@ -39,6 +39,7 @@
 
 (require 'button)
 (require 'ansi-color)
+(require 'project)
 
 ;;; Bookmark integration
 (defvar bookmark-make-record-function)
@@ -60,6 +61,11 @@
   "Ansible documentation lookup."
   :group 'ansible
   :prefix 'ansible-doc)
+
+(defcustom ansible-doc-cache-modules-list-by-projet nil
+  "If non-nil, modules list is cached by project rather than globally."
+  :group 'ansible-doc
+  :type 'boolean)
 
 (defface ansible-doc-header '((t :inherit bold))
   "Face for Ansible documentation header."
@@ -113,9 +119,12 @@
 (defvar ansible-doc--modules nil
   "A list of all known Ansible modules.")
 
-(defun ansible-doc-modules ()
-  "Get a list of all known Ansible modules."
-  (unless ansible-doc--modules
+(defvar ansible-doc--modules-by-project (make-hash-table :test 'equal)
+  "A hash-table of all known Ansible modules by project.")
+
+(defun ansible-doc--find-modules ()
+  "Compute a list of all known Ansible modules in current context."
+  (let ((modules))
     (message "Finding Ansible modules...")
     (with-temp-buffer
       (when (with-demoted-errors "Error while finding Ansible modules: %S"
@@ -131,8 +140,23 @@
                                        (one-or-more not-newline)
                                        line-end)
                                    nil 'noerror)
-          (push (match-string 1) ansible-doc--modules)))))
-  ansible-doc--modules)
+          (push (match-string 1) modules))))
+    modules))
+
+(defun ansible-doc-modules ()
+  "Get a list of all known Ansible modules.
+For performance concerns, the list is cached.  The cache can be global or
+by project (depending on `ansible-doc-cache-modules-list-by-project' value)."
+  (if-let* ((_ ansible-doc-cache-modules-list-by-projet)
+            (project (project-current nil))
+            (project-root (project-root project)))
+      (progn
+        (unless (gethash project-root ansible-doc--modules-by-project)
+          (puthash project-root (ansible-doc--find-modules) ansible-doc--modules-by-project))
+        (gethash project-root ansible-doc--modules-by-project))
+    (unless ansible-doc--modules
+      (setq ansible-doc--modules (ansible-doc--find-modules)))
+    ansible-doc--modules))
 
 (defun ansible-doc--symbol-with-dots-at-point ()
   "Return symbol with dots at point."
