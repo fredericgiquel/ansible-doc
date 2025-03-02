@@ -67,6 +67,17 @@
   :group 'ansible-doc
   :type 'boolean)
 
+(defcustom ansible-doc-tool 'ansible-doc
+  "Tool used to access documentation."
+  :group 'ansible-doc
+  :type '(choice (const :tag "ansible-doc" ansible-doc)
+                 (const :tag "ansible-navigator" ansible-navigator)))
+
+(defcustom ansible-doc-navigator-extra-args '("--mode" "stdout" "--pp" "never" "--lf" "/dev/null" "--senv" "PAGER=cat")
+  "Additional arguments for ansible-navigator."
+  :group 'ansible-doc
+  :type '(repeat string))
+
 (defface ansible-doc-header '((t :inherit bold))
   "Face for Ansible documentation header."
   :group 'ansible-doc
@@ -124,11 +135,16 @@
 
 (defun ansible-doc--find-modules ()
   "Compute a list of all known Ansible modules in current context."
-  (let ((modules))
+  (let ((modules)
+        (tool ansible-doc-tool))
     (message "Finding Ansible modules...")
     (with-temp-buffer
       (when (with-demoted-errors "Error while finding Ansible modules: %S"
-              (let ((retcode (call-process "ansible-doc" nil '(t nil) nil "--list")))
+              (let ((retcode (apply 'call-process
+                                    (pcase tool
+                                      ('ansible-doc `("ansible-doc" nil ,(list t nil) nil "--list"))
+                                      ('ansible-navigator (append `("ansible-navigator" nil ,(list t nil) nil "doc" "--list")
+                                                                  ansible-doc-navigator-extra-args))))))
                 (unless (equal retcode 0)
                   (error "Command ansible-doc --list failed with code %s, returned %s"
                          retcode (buffer-string)))
@@ -296,7 +312,11 @@ If NOCONFIRM is non-nil revert without prompt."
       (message "Loading documentation for module %s" module)
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (call-process "ansible-doc" nil t t module)
+        (apply 'call-process
+               (pcase ansible-doc-tool
+                 ('ansible-doc `("ansible-doc" nil t t ,module))
+                 ('ansible-navigator (append `("ansible-navigator" nil ,(list t nil) t "doc" ,module)
+                                             ansible-doc-navigator-extra-args))))
         (let ((delete-trailing-lines t))
           (delete-trailing-whitespace))
         (ansible-doc-fontify-yaml-examples))
@@ -348,12 +368,16 @@ If NOCONFIRM is non-nil revert without prompt."
 (defun ansible-doc-buffer (module)
   "Create a documentation buffer for MODULE."
   (let* ((buffer-name (format ansible-doc--buffer-name module))
-         (buffer (get-buffer buffer-name)))
+         (buffer (get-buffer buffer-name))
+         (buffer-local-tool (local-variable-p 'ansible-doc-tool))
+         (tool ansible-doc-tool))
     (unless buffer
       (setq buffer (get-buffer-create buffer-name))
       (with-current-buffer buffer
         (ansible-doc-module-mode)
         (setq ansible-doc-current-module module)
+        (when buffer-local-tool
+          (setq-local ansible-doc-tool tool))
         (revert-buffer nil 'noconfirm)
         (let ((inhibit-read-only t))
           (ansi-color-apply-on-region (point-min) (point-max)))))
